@@ -142,6 +142,7 @@ private:
 	std::queue<uint8_t> kbd_queue;
 	uint16_t serial_status;
 	bool serial_input;
+	uint8_t m_hack;
 	// End registers
 
 	address_space *m_mem;
@@ -168,6 +169,11 @@ void r9751_state::kbd_put(u8 data)
 	//else
 	{
 		kbd_queue.push(data);
+		if (serial_status == 0)
+		{
+			serial_status = 0x4440;
+			m_maincpu->space(AS_PROGRAM).write_byte(smioc_in_addr + 1, kbd_queue.front());
+		}
 	}
 }
 
@@ -291,12 +297,15 @@ READ32_MEMBER( r9751_state::r9751_mmio_5ff_r )
 		case 0x0898: /* Serial status or DMA status */
 			if(serial_status == 0)
 			{
-				data = 0x8000;
+				data = 0;
+
+				if(((m_hack++) & 3) == 0)
+					data = 0x8040;
 
 				if (!kbd_queue.empty())
 				{
-					m_maincpu->space(AS_PROGRAM).write_byte(smioc_in_addr, data);
-					data = 0x5440;
+					m_maincpu->space(AS_PROGRAM).write_byte(smioc_in_addr + 1, kbd_queue.front());
+					data = 0x4440;
 				}
 			}
 			else
@@ -359,6 +368,10 @@ WRITE32_MEMBER( r9751_state::r9751_mmio_5ff_w )
 			break;
 		/* SMIOC region (0x98, device 26) - Output */
 		case 0x0298:
+			if (serial_status == 0x4440)
+			{
+				if (!kbd_queue.empty()) kbd_queue.pop();
+			}
 			serial_status = 0;
 			if(TRACE_SMIOC) logerror("Serial status: %08X PC: %08X\n", data, m_maincpu->pc());
 			TRACE_SMIOC_WRITE(offset << 2 | 0x5FF00000, data, "Serial Status 1", nullptr);
@@ -377,6 +390,12 @@ WRITE32_MEMBER( r9751_state::r9751_mmio_5ff_w )
 					serial_status = 0x0140;
 					m_serial_status2 = 0x0140;
 					if(TRACE_SMIOC) logerror("Serial DMA command 0x1000 PC: %08X\n", m_maincpu->pc());
+					break;
+
+				case 0x1100:
+					serial_status = 0; // Giant hack
+					m_serial_status2 = 0;
+					if (TRACE_SMIOC) logerror("Serial DMA command 0x1100 PC: %08X\n", m_maincpu->pc());
 					break;
 				case 0x4100: /* Send byte to serial */
 					for(int i = 0; i < smioc_dma_w_length; i++)
@@ -403,7 +422,7 @@ WRITE32_MEMBER( r9751_state::r9751_mmio_5ff_w )
 					break;
 				default:
 					if(TRACE_SMIOC) logerror("Unknown serial DMA command: %X\n", data);
-					serial_status = 0x40;
+					//serial_status = 0x40;
 			}
 			TRACE_SMIOC_WRITE(offset << 2 | 0x5FF00000, data, "Serial Command", nullptr);
 			break;
