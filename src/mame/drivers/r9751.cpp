@@ -56,7 +56,7 @@
 #include "machine/wd33c93.h"
 
 #include "machine/pdc.h"
-//#include "machine/smioc.h"
+#include "machine/smioc.h"
 #include "softlist.h"
 
 #include <queue>
@@ -89,7 +89,7 @@ public:
 		: driver_device(mconfig, type, tag),
 		m_maincpu(*this, "maincpu"),
 		m_pdc(*this, "pdc"),
-		//m_smioc(*this, "smioc"),
+		m_smioc(*this, "smioc"),
 		m_wd33c93(*this, "wd33c93"),
 		m_terminal(*this, "terminal"),
 		m_main_ram(*this, "main_ram")
@@ -119,7 +119,7 @@ private:
 
 	required_device<cpu_device> m_maincpu;
 	required_device<pdc_device> m_pdc;
-	//required_device<smioc_device> m_smioc;
+	required_device<smioc_device> m_smioc;
 	required_device<wd33c93_device> m_wd33c93;
 	required_device<generic_terminal_device> m_terminal;
 	required_shared_ptr<uint32_t> m_main_ram;
@@ -394,6 +394,7 @@ WRITE32_MEMBER( r9751_state::r9751_mmio_5ff_w )
 
 		case 0x4090:
 		case 0x4098: /* Serial DMA Command */
+			m_smioc->SendCommand(data);
 			switch(data)
 			{
 				case 0x1000:
@@ -690,7 +691,7 @@ MACHINE_CONFIG_START(r9751_state::r9751)
 	MCFG_GENERIC_TERMINAL_KEYBOARD_CB(PUT(r9751_state, kbd_put))
 
 	/* i/o hardware */
-	//MCFG_DEVICE_ADD("smioc", SMIOC, 0)
+	MCFG_DEVICE_ADD("smioc", SMIOC, 0)
 
 	/* disk hardware */
 	PDC(config, m_pdc, 0);

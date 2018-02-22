@@ -31,6 +31,23 @@ public:
 	/* Constructor and Destructor */
 	smioc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
+	DECLARE_READ8_MEMBER(ram2_mmio_r);
+	DECLARE_WRITE8_MEMBER(ram2_mmio_w);
+
+	DECLARE_READ8_MEMBER(boardlogic_mmio_r);
+	DECLARE_WRITE8_MEMBER(boardlogic_mmio_w);
+
+	DECLARE_READ8_MEMBER(scc2698b_mmio_r);
+	DECLARE_WRITE8_MEMBER(scc2698b_mmio_w);
+
+	u16 m_status;
+	u16 m_status2;
+
+	u8 m_requestFlags_11D;
+	u16 m_commandValue;
+
+	void SendCommand(u16 command);
+
 protected:
 	/* Device-level overrides */
 	virtual void device_start() override;
@@ -49,7 +66,8 @@ private:
 
 	required_shared_ptr<uint8_t> m_smioc_ram;
 
-	void smioc_mem(address_map &map);
+	void update_and_log(u16& reg, u16 newValue, const char* register_name);
+
 };
 
 /* Device type */

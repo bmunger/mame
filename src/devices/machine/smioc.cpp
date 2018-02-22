@@ -99,16 +99,18 @@ const tiny_rom_entry *smioc_device::device_rom_region() const
 //  ADDRESS_MAP( smioc_mem )
 //-------------------------------------------------
 
-void smioc_device::smioc_mem(address_map &map)
-{
-	map(0x00000, 0x07FFF).ram().share("smioc_ram");
-	map(0xC0080, 0xC008F).rw("dma8237_1", FUNC(am9517a_device::read), FUNC(am9517a_device::write)); // Probably RAM DMA
-	map(0xC0090, 0xC009F).rw("dma8237_2", FUNC(am9517a_device::read), FUNC(am9517a_device::write)); // Serial DMA
-	map(0xC00A0, 0xC00AF).rw("dma8237_3", FUNC(am9517a_device::read), FUNC(am9517a_device::write)); // Serial DMA
-	map(0xC00B0, 0xC00BF).rw("dma8237_4", FUNC(am9517a_device::read), FUNC(am9517a_device::write)); // Serial DMA
-	map(0xC00C0, 0xC00CF).rw("dma8237_5", FUNC(am9517a_device::read), FUNC(am9517a_device::write)); // Serial DMA
-	map(0xF8000, 0xFFFFF).rom().region("rom", 0);
-}
+static ADDRESS_MAP_START( smioc_mem, AS_PROGRAM, 8, smioc_device )
+	AM_RANGE(0x00000, 0x07FFF) AM_RAM AM_SHARE("smioc_ram")
+	AM_RANGE(0x40000, 0x4FFFF) AM_READWRITE(ram2_mmio_r, ram2_mmio_w)
+	AM_RANGE(0xC0080, 0xC008F) AM_DEVREADWRITE("dma8237_1",am9517a_device,read,write) // Probably RAM DMA
+	AM_RANGE(0xC0090, 0xC009F) AM_DEVREADWRITE("dma8237_2",am9517a_device,read,write) // Serial DMA
+	AM_RANGE(0xC00A0, 0xC00AF) AM_DEVREADWRITE("dma8237_3",am9517a_device,read,write) // Serial DMA
+	AM_RANGE(0xC00B0, 0xC00BF) AM_DEVREADWRITE("dma8237_4",am9517a_device,read,write) // Serial DMA
+	AM_RANGE(0xC00C0, 0xC00CF) AM_DEVREADWRITE("dma8237_5",am9517a_device,read,write) // Serial DMA
+	AM_RANGE(0xC0100, 0xC011F) AM_READWRITE(boardlogic_mmio_r, boardlogic_mmio_w)
+	AM_RANGE(0xC0200, 0xC023F) AM_READWRITE(scc2698b_mmio_r, scc2698b_mmio_w) // Future: Emulate the SCC2698B UART as a separate component
+	AM_RANGE(0xF8000, 0xFFFFF) AM_ROM AM_REGION("rom", 0)
+ADDRESS_MAP_END
 
 MACHINE_CONFIG_START(smioc_device::device_add_mconfig)
 	/* CPU - Intel 80C188 */
@@ -159,3 +161,105 @@ void smioc_device::device_reset()
 	/* Reset CPU */
 	m_smioccpu->reset();
 }
+
+
+void smioc_device::SendCommand(u16 command)
+{
+	m_commandValue = command;
+	m_requestFlags_11D |= 1;
+	
+	m_smioccpu->set_input_line(INPUT_LINE_IRQ2, HOLD_LINE);
+	
+}
+
+
+void smioc_device::update_and_log(u16& reg, u16 newValue, const char* register_name)
+{
+	if (reg != newValue)
+	{
+		logerror("Update %s %04X -> %04X\n", register_name, reg, newValue);
+		reg = newValue;
+	}
+}
+
+READ8_MEMBER(smioc_device::ram2_mmio_r)
+{
+	u8 data = 0;
+	switch (offset)
+	{
+	case 0xCC2: // Command from 68k?
+		data = m_commandValue & 0xFF;
+		break;
+	case 0xCC3:
+		data = m_commandValue >> 8;
+		break;
+	}
+
+
+	logerror("ram2[%04X] => %02X\n", offset, data);
+	return data;
+}
+
+WRITE8_MEMBER(smioc_device::ram2_mmio_w)
+{
+	switch (offset) // Offset based on C0100 register base
+	{
+	case 0xC84:
+		update_and_log(m_status2, (m_status2 & 0xFF00) | data, "Status2[40C84]");
+		return;
+	case 0xC85:
+		update_and_log(m_status2, (m_status2 & 0xFF) | (data<<8), "Status2[40C85]");
+		return;
+
+	case 0xC88:
+		update_and_log(m_status, (m_status & 0xFF00) | data, "Status[40C88]");
+		return;
+	case 0xC89:
+		update_and_log(m_status, (m_status & 0xFF) | (data<<8), "Status[40C89]");
+		return;
+
+	}
+
+
+	logerror("ram2[%04X] <= %02X\n", offset, data);
+}
+
+
+READ8_MEMBER(smioc_device::boardlogic_mmio_r)
+{
+	u8 data = 0xFF;
+	switch (offset)
+	{
+		case 0x1D: // C011D (HW Request flags)
+			data = m_requestFlags_11D;
+			break;
+
+	}
+	logerror("logic[%04X] => %02X\n", offset, data);
+	return data;
+}
+
+WRITE8_MEMBER(smioc_device::boardlogic_mmio_w)
+{
+	switch (offset)
+	{
+	case 0x10: // C0110 (Command complete?)
+		m_requestFlags_11D = 0;
+		break;
+
+	}
+	logerror("logic[%04X] <= %02X\n", offset, data);
+}
+
+
+
+READ8_MEMBER(smioc_device::scc2698b_mmio_r)
+{
+	return 0;
+}
+
+WRITE8_MEMBER(smioc_device::scc2698b_mmio_w)
+{
+
+}
+
