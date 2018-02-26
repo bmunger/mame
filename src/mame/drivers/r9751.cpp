@@ -330,6 +330,9 @@ READ32_MEMBER( r9751_state::r9751_mmio_5ff_r )
 		case 0x1098: /* Serial word count register */
 			return m_serial_wordcount;
 
+		case 0x2898: /* SMIOC DMA Busy register - nonzero = busy */
+			return m_smioc->m_deviceBusy;
+
 		/* PDC FDD region (0xB0, device 44 */
 		case 0x08B0: /* FDD Command result code */
 			return 0x10;
@@ -438,12 +441,14 @@ WRITE32_MEMBER( r9751_state::r9751_mmio_5ff_w )
 			TRACE_SMIOC_WRITE(offset << 2 | 0x5FF00000, data, "Serial Command", nullptr);
 			break;
 		case 0xC098: /* Serial DMA output address */
+			m_smioc->m_dmaSendAddress = data;
 			smioc_out_addr = (smioc_dma_bank & 0x7FFFF800) | ((data&0x3FF)<<1);
 			if(TRACE_SMIOC) logerror("Serial output address: %08X PC: %08X\n", smioc_out_addr, m_maincpu->pc());
 			TRACE_SMIOC_WRITE(offset << 2 | 0x5FF00000, data, "Serial Out Address", nullptr);
 			break;
 		/* SMIOC region (0x9C, device 27) - Input */
 		case 0x409C: /* Serial DMA write length */
+			m_smioc->m_dmaSendLength = data;
 			smioc_dma_w_length = (~data+1) & 0xFFFF;
 			if(TRACE_SMIOC) logerror("Serial DMA write length: %08X PC: %08X\n", smioc_dma_w_length, m_maincpu->pc());
 			if(smioc_dma_w_length > 0x400) smioc_dma_w_length = 0x400;

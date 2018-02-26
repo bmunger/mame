@@ -43,6 +43,12 @@ public:
 	u16 m_status;
 	u16 m_status2;
 
+	u8 m_deviceBusy;
+
+	u16 m_dmaSendAddress;
+	u16 m_dmaSendLength;
+
+
 	u8 m_requestFlags_11D;
 	u16 m_commandValue;
 
@@ -58,7 +64,7 @@ protected:
 
 private:
 	/* Attached devices */
-	required_device<cpu_device> m_smioccpu;
+	required_device<i80188_cpu_device> m_smioccpu;
 
 	required_device_array<am9517a_device, 5> m_dma8237;
 

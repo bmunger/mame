@@ -167,8 +167,10 @@ void smioc_device::SendCommand(u16 command)
 {
 	m_commandValue = command;
 	m_requestFlags_11D |= 1;
+	m_deviceBusy = 1;
 	
-	m_smioccpu->set_input_line(INPUT_LINE_IRQ2, HOLD_LINE);
+	//m_smioccpu->set_input_line(INPUT_LINE_IRQ2, HOLD_LINE);
+	m_smioccpu->int2_w(HOLD_LINE);
 	
 }
 
@@ -193,6 +195,21 @@ READ8_MEMBER(smioc_device::ram2_mmio_r)
 	case 0xCC3:
 		data = m_commandValue >> 8;
 		break;
+
+	case 0xCD8: // DMA source address (for writing characters) - Port 0
+		data = m_dmaSendAddress & 0xFF;
+		break;
+	case 0xCD9:
+		data = m_dmaSendAddress >> 8;
+		break;
+
+	case 0xCE8: // DMA Length (for writing characters) - Port 0
+		data = m_dmaSendLength & 0xFF;
+		break;
+	case 0xCE9:
+		data = m_dmaSendLength >> 8;
+		break;
+
 	}
 
 
@@ -204,6 +221,7 @@ WRITE8_MEMBER(smioc_device::ram2_mmio_w)
 {
 	switch (offset) // Offset based on C0100 register base
 	{
+		
 	case 0xC84:
 		update_and_log(m_status2, (m_status2 & 0xFF00) | data, "Status2[40C84]");
 		return;
@@ -211,11 +229,19 @@ WRITE8_MEMBER(smioc_device::ram2_mmio_w)
 		update_and_log(m_status2, (m_status2 & 0xFF) | (data<<8), "Status2[40C85]");
 		return;
 
+	/*
 	case 0xC88:
 		update_and_log(m_status, (m_status & 0xFF00) | data, "Status[40C88]");
 		return;
 	case 0xC89:
 		update_and_log(m_status, (m_status & 0xFF) | (data<<8), "Status[40C89]");
+		return;
+	*/
+	case 0xCC4:
+		update_and_log(m_status, (m_status & 0xFF00) | data, "Status[40CC4]");
+		return;
+	case 0xCC5:
+		update_and_log(m_status, (m_status & 0xFF) | (data << 8), "Status[40CC5]");
 		return;
 
 	}
@@ -230,8 +256,18 @@ READ8_MEMBER(smioc_device::boardlogic_mmio_r)
 	u8 data = 0xFF;
 	switch (offset)
 	{
+
+		case 0x19: // Hardware revision?
+			// Top bit controls which set of register locations in RAM2 are polled
+			data = 0x7F;
+			break;
+
 		case 0x1D: // C011D (HW Request flags)
 			data = m_requestFlags_11D;
+			// Assume this is a clear-on-read register - It is read in one location and all set bits are acted on once it is read.
+			m_requestFlags_11D = 0;
+
+
 			break;
 
 	}
@@ -243,8 +279,18 @@ WRITE8_MEMBER(smioc_device::boardlogic_mmio_w)
 {
 	switch (offset)
 	{
-	case 0x10: // C0110 (Command complete?)
-		m_requestFlags_11D = 0;
+	case 0x10: // C0110 (Clear interrupt? This seems to happen a lot but without being related to actually completing anything.)
+		m_smioccpu->int2_w(CLEAR_LINE);
+		m_deviceBusy = 0;
+		break;
+
+	case 0x11: // C0111 - Set to 1 after providing a status - Possibly clears device busy status.
+		//m_deviceBusy = 0;
+		break;
+
+	case 0x16: // C0116 - Set to 1 after processing 11D & 0x40
+		break;
+	case 0x17: // C0117 - Set to 1 after processing 11D & 0x80
 		break;
 
 	}
