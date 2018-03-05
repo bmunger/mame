@@ -142,6 +142,7 @@ smioc_device::smioc_device(const machine_config &mconfig, const char *tag, devic
 	m_rs232_p(*this, "rs232_p%u", 1),
 	m_smioc_ram(*this, "smioc_ram")
 {
+
 }
 
 //-------------------------------------------------
@@ -239,10 +240,10 @@ WRITE8_MEMBER(smioc_device::ram2_mmio_w)
 	*/
 	case 0xCC4:
 		update_and_log(m_status, (m_status & 0xFF00) | data, "Status[40CC4]");
-		return;
+		break; // return;
 	case 0xCC5:
 		update_and_log(m_status, (m_status & 0xFF) | (data << 8), "Status[40CC5]");
-		return;
+		break; // return;
 
 	}
 
@@ -270,6 +271,12 @@ READ8_MEMBER(smioc_device::boardlogic_mmio_r)
 
 			break;
 
+		case 0x1F: // C011F (HW Status flags?)
+			// 0x80, 0x40 seem to be HW request to cancel ongoing DMA requests, maybe related to board reset?
+			// 0x01 - When this is 0, advance some state perhaps related to talking to the 8051
+			data = 0xFF;
+			break;
+
 	}
 	logerror("logic[%04X] => %02X\n", offset, data);
 	return data;
@@ -281,11 +288,17 @@ WRITE8_MEMBER(smioc_device::boardlogic_mmio_w)
 	{
 	case 0x10: // C0110 (Clear interrupt? This seems to happen a lot but without being related to actually completing anything.)
 		m_smioccpu->int2_w(CLEAR_LINE);
-		m_deviceBusy = 0;
+		m_deviceBusy = m_requestFlags_11D;
 		break;
 
-	case 0x11: // C0111 - Set to 1 after providing a status - Possibly clears device busy status.
-		//m_deviceBusy = 0;
+	case 0x11: // C0111 - Set to 1 after providing a status - Acknowledge by hardware by raising bit 4 in C011D (SMIOC E2E flag 0x200
+		m_requestFlags_11D |= 0x10; // bit 4
+		m_smioccpu->int2_w(HOLD_LINE);
+		break;
+
+	case 0x12: // C0112 - Set to 1 after providing a status(2?) - Acknowledge by hardware by raising bit 5 in C011D (SMIOC E2E flag 0x100)
+		m_requestFlags_11D |= 0x20; // bit 5
+		m_smioccpu->int2_w(HOLD_LINE);
 		break;
 
 	case 0x16: // C0116 - Set to 1 after processing 11D & 0x40
