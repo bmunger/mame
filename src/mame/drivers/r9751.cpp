@@ -320,7 +320,9 @@ READ32_MEMBER( r9751_state::r9751_mmio_5ff_r )
 			}
 			if(TRACE_SMIOC) logerror("serial_status_queue = %04X \n", data | 0x8);
 			TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, data | 0x8, "Serial Status 1",  nullptr);
-			return data | 0x8;
+			TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, m_smioc->m_status, "(Real)Serial Status 1", nullptr);
+
+			return m_smioc->m_status;
 		case 0x0870: /* Serial status or DMA status 2 */
 			if(TRACE_SMIOC) logerror("m_serial_status2 = %04X \n", m_serial_status2);
 			TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, m_serial_status2, "Serial Status 2", nullptr);

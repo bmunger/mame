@@ -99,14 +99,15 @@ const tiny_rom_entry *smioc_device::device_rom_region() const
 //  ADDRESS_MAP( smioc_mem )
 //-------------------------------------------------
 
-static ADDRESS_MAP_START( smioc_mem, AS_PROGRAM, 8, smioc_device )
+static ADDRESS_MAP_START(smioc_mem, AS_PROGRAM, 8, smioc_device)
 	AM_RANGE(0x00000, 0x07FFF) AM_RAM AM_SHARE("smioc_ram")
 	AM_RANGE(0x40000, 0x4FFFF) AM_READWRITE(ram2_mmio_r, ram2_mmio_w)
-	AM_RANGE(0xC0080, 0xC008F) AM_DEVREADWRITE("dma8237_1",am9517a_device,read,write) // Probably RAM DMA
-	AM_RANGE(0xC0090, 0xC009F) AM_DEVREADWRITE("dma8237_2",am9517a_device,read,write) // Serial DMA
-	AM_RANGE(0xC00A0, 0xC00AF) AM_DEVREADWRITE("dma8237_3",am9517a_device,read,write) // Serial DMA
-	AM_RANGE(0xC00B0, 0xC00BF) AM_DEVREADWRITE("dma8237_4",am9517a_device,read,write) // Serial DMA
-	AM_RANGE(0xC00C0, 0xC00CF) AM_DEVREADWRITE("dma8237_5",am9517a_device,read,write) // Serial DMA
+	AM_RANGE(0x50000, 0x5FFFF) AM_READWRITE(dma68k_r, dma68k_w)
+	AM_RANGE(0xC0080, 0xC008F) AM_DEVREADWRITE("dma8237_1", am9517a_device, read, write) // Probably RAM DMA
+	AM_RANGE(0xC0090, 0xC009F) AM_DEVREADWRITE("dma8237_2", am9517a_device, read, write) // Serial DMA
+	AM_RANGE(0xC00A0, 0xC00AF) AM_DEVREADWRITE("dma8237_3", am9517a_device, read, write) // Serial DMA
+	AM_RANGE(0xC00B0, 0xC00BF) AM_DEVREADWRITE("dma8237_4", am9517a_device, read, write) // Serial DMA
+	AM_RANGE(0xC00C0, 0xC00CF) AM_DEVREADWRITE("dma8237_5", am9517a_device, read, write) // Serial DMA
 	AM_RANGE(0xC0100, 0xC011F) AM_READWRITE(boardlogic_mmio_r, boardlogic_mmio_w)
 	AM_RANGE(0xC0200, 0xC023F) AM_READWRITE(scc2698b_mmio_r, scc2698b_mmio_w) // Future: Emulate the SCC2698B UART as a separate component
 	AM_RANGE(0xF8000, 0xFFFFF) AM_ROM AM_REGION("rom", 0)
@@ -140,7 +141,8 @@ smioc_device::smioc_device(const machine_config &mconfig, const char *tag, devic
 	m_smioccpu(*this, I188_TAG),
 	m_dma8237(*this, "dma8237_%u", 1),
 	m_rs232_p(*this, "rs232_p%u", 1),
-	m_smioc_ram(*this, "smioc_ram")
+	m_smioc_ram(*this, "smioc_ram"),
+	m_dma_timer(nullptr)
 {
 
 }
@@ -151,6 +153,7 @@ smioc_device::smioc_device(const machine_config &mconfig, const char *tag, devic
 
 void smioc_device::device_start()
 {
+	m_dma_timer = timer_alloc(0, nullptr);
 }
 
 //-------------------------------------------------
@@ -161,8 +164,18 @@ void smioc_device::device_reset()
 {
 	/* Reset CPU */
 	m_smioccpu->reset();
+	m_smioccpu->drq0_w(1);
 }
 
+void smioc_device::device_timer(emu_timer &timer, device_timer_id tid, int param, void *ptr)
+{
+	switch (tid)
+	{
+	case 0: // DMA Timer
+		m_smioccpu->drq0_w(1);
+		break;
+	}
+}
 
 void smioc_device::SendCommand(u16 command)
 {
@@ -239,10 +252,10 @@ WRITE8_MEMBER(smioc_device::ram2_mmio_w)
 		return;
 	*/
 	case 0xCC4:
-		update_and_log(m_status, (m_status & 0xFF00) | data, "Status[40CC4]");
+		update_and_log(m_status, (m_status & 0xFF) | (data<<8), "Status[40CC4]");
 		break; // return;
 	case 0xCC5:
-		update_and_log(m_status, (m_status & 0xFF) | (data << 8), "Status[40CC5]");
+		update_and_log(m_status, (m_status & 0xFF00) | (data), "Status[40CC5]");
 		break; // return;
 
 	}
@@ -251,6 +264,23 @@ WRITE8_MEMBER(smioc_device::ram2_mmio_w)
 	logerror("ram2[%04X] <= %02X\n", offset, data);
 }
 
+READ8_MEMBER(smioc_device::dma68k_r)
+{
+	u8 data = 0;
+
+	m_dma_timer->adjust(attotime::from_usec(10));
+
+	logerror("dma68k[%04X] => %02X\n", offset, data);
+	return data;
+}
+
+WRITE8_MEMBER(smioc_device::dma68k_w)
+{
+
+	m_dma_timer->adjust(attotime::from_usec(10));
+
+	logerror("dma68k[%04X] <= %02X\n", offset, data);
+}
 
 READ8_MEMBER(smioc_device::boardlogic_mmio_r)
 {

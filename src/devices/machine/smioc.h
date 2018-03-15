@@ -34,6 +34,9 @@ public:
 	DECLARE_READ8_MEMBER(ram2_mmio_r);
 	DECLARE_WRITE8_MEMBER(ram2_mmio_w);
 
+	DECLARE_READ8_MEMBER(dma68k_r);
+	DECLARE_WRITE8_MEMBER(dma68k_w);
+
 	DECLARE_READ8_MEMBER(boardlogic_mmio_r);
 	DECLARE_WRITE8_MEMBER(boardlogic_mmio_w);
 
@@ -61,6 +64,7 @@ protected:
 	/* Optional information overrides */
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual const tiny_rom_entry *device_rom_region() const override;
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 private:
 	/* Attached devices */
@@ -74,6 +78,7 @@ private:
 
 	void update_and_log(u16& reg, u16 newValue, const char* register_name);
 
+	emu_timer *m_dma_timer;
 };
 
 /* Device type */
