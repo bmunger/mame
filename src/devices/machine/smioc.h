@@ -43,6 +43,13 @@ public:
 	DECLARE_READ8_MEMBER(scc2698b_mmio_r);
 	DECLARE_WRITE8_MEMBER(scc2698b_mmio_w);
 
+	DECLARE_WRITE_LINE_MEMBER(dma8237_2_hreq_w);
+
+	DECLARE_WRITE_LINE_MEMBER(dma8237_dack_2_0_w);
+	DECLARE_WRITE_LINE_MEMBER(dma8237_dack_2_1_w);
+	DECLARE_WRITE_LINE_MEMBER(dma8237_dack_2_2_w);
+	DECLARE_WRITE_LINE_MEMBER(dma8237_dack_2_3_w);
+
 	u16 m_status;
 	u16 m_status2;
 
@@ -56,6 +63,8 @@ public:
 	u16 m_commandValue;
 
 	void SendCommand(u16 command);
+	void ClearStatus();
+	void ClearStatus2();
 
 protected:
 	/* Device-level overrides */

@@ -121,8 +121,13 @@ MACHINE_CONFIG_START(smioc_device::device_add_mconfig)
 	/* DMA */
 	for (required_device<am9517a_device> &dma : m_dma8237)
 		AM9517A(config, dma, 20_MHz_XTAL / 4); // Clock division unknown
+	MCFG_I8237_OUT_HREQ_CB(WRITELINE(smioc_device, dma8237_2_hreq_w))
+	MCFG_I8237_OUT_DACK_0_CB(WRITELINE(smioc_device, dma8237_dack_2_0_w))
+	MCFG_I8237_OUT_DACK_1_CB(WRITELINE(smioc_device, dma8237_dack_2_1_w))
+	MCFG_I8237_OUT_DACK_2_CB(WRITELINE(smioc_device, dma8237_dack_2_2_w))
+	MCFG_I8237_OUT_DACK_3_CB(WRITELINE(smioc_device, dma8237_dack_2_3_w))
 
-	/* RS232 */
+	/* RS232 */	
 	/* Port 1: Console */
 	for (required_device<rs232_port_device> &rs232_port : m_rs232_p)
 		RS232_PORT(config, rs232_port, default_rs232_devices, nullptr);
@@ -165,6 +170,10 @@ void smioc_device::device_reset()
 	/* Reset CPU */
 	m_smioccpu->reset();
 	m_smioccpu->drq0_w(1);
+
+	// Attempt to get DMA working by just holding DREQ high for the first dma chip
+	m_dma8237_2->dreq1_w(1);
+	m_dma8237_2->dreq3_w(1);
 }
 
 void smioc_device::device_timer(emu_timer &timer, device_timer_id tid, int param, void *ptr)
@@ -186,6 +195,15 @@ void smioc_device::SendCommand(u16 command)
 	//m_smioccpu->set_input_line(INPUT_LINE_IRQ2, HOLD_LINE);
 	m_smioccpu->int2_w(HOLD_LINE);
 	
+}
+
+void smioc_device::ClearStatus()
+{
+	m_status = 0;
+}
+void smioc_device::ClearStatus2()
+{
+	m_status2 = 0;
 }
 
 
@@ -350,5 +368,30 @@ READ8_MEMBER(smioc_device::scc2698b_mmio_r)
 WRITE8_MEMBER(smioc_device::scc2698b_mmio_w)
 {
 
+}
+
+// The logic on the SMIOC board somehow proxies the UART's information about what channels are ready into the DMA DREQ lines.
+// It's not 100% clear how this works, but a rough guess is it's providing !(RDYN) & (!DACK).
+// For now pretend the UART is always ready.
+WRITE_LINE_MEMBER(smioc_device::dma8237_dack_2_0_w)
+{
+	m_dma8237_2->dreq0_w(1); // Disable channel 0 (UART 0 RX)
+}
+WRITE_LINE_MEMBER(smioc_device::dma8237_dack_2_1_w)
+{
+	m_dma8237_2->dreq1_w(!state); // Uart 0 TX
+}
+WRITE_LINE_MEMBER(smioc_device::dma8237_dack_2_2_w)
+{
+	m_dma8237_2->dreq2_w(1); // Disable channel 2 (UART 1 RX)
+}
+WRITE_LINE_MEMBER(smioc_device::dma8237_dack_2_3_w)
+{
+	m_dma8237_2->dreq3_w(!state);
+}
+
+WRITE_LINE_MEMBER(smioc_device::dma8237_2_hreq_w)
+{
+	m_dma8237_2->hack_w(state);
 }
 

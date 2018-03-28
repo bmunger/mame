@@ -319,13 +319,13 @@ READ32_MEMBER( r9751_state::r9751_mmio_5ff_r )
 				data = serial_status;
 			}
 			if(TRACE_SMIOC) logerror("serial_status_queue = %04X \n", data | 0x8);
-			TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, data | 0x8, "Serial Status 1",  nullptr);
-			TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, m_smioc->m_status, "(Real)Serial Status 1", nullptr);
+			//TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, data | 0x8, "Serial Status 1",  nullptr);
+			//TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, m_smioc->m_status, "(Real)Serial Status 1", nullptr);
 
 			return m_smioc->m_status;
 		case 0x0870: /* Serial status or DMA status 2 */
 			if(TRACE_SMIOC) logerror("m_serial_status2 = %04X \n", m_serial_status2);
-			TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, m_serial_status2, "Serial Status 2", nullptr);
+			//TRACE_SMIOC_READ(offset << 2 | 0x5FF00000, m_serial_status2, "Serial Status 2", nullptr);
 			return m_serial_status2;
 		/* SMIOC region (0x9C, device 27) */
 
@@ -388,11 +388,13 @@ WRITE32_MEMBER( r9751_state::r9751_mmio_5ff_w )
 			}
 			serial_status = 0;
 			m_serial_wordcount = 0;
+			m_smioc->ClearStatus();
 			if(TRACE_SMIOC) logerror("Serial status: %08X PC: %08X\n", data, m_maincpu->pc());
 			TRACE_SMIOC_WRITE(offset << 2 | 0x5FF00000, data, "Serial Status 1", nullptr);
 			break;
 		case 0x0270:
 			m_serial_status2 = data;
+			m_smioc->ClearStatus2();
 			if(TRACE_SMIOC) logerror("Serial status2: %08X PC: %08X\n", data, m_maincpu->pc());
 			TRACE_SMIOC_WRITE(offset << 2 | 0x5FF00000, data, "Serial Status 2", nullptr);
 			break;
