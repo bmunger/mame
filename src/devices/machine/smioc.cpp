@@ -147,7 +147,9 @@ smioc_device::smioc_device(const machine_config &mconfig, const char *tag, devic
 	m_dma8237(*this, "dma8237_%u", 1),
 	m_rs232_p(*this, "rs232_p%u", 1),
 	m_smioc_ram(*this, "smioc_ram"),
-	m_dma_timer(nullptr)
+	m_dma_timer(nullptr),
+	m_m68k_r_cb(*this),
+	m_m68k_w_cb(*this)
 {
 
 }
@@ -170,6 +172,10 @@ void smioc_device::device_reset()
 	/* Reset CPU */
 	m_smioccpu->reset();
 	m_smioccpu->drq0_w(1);
+
+	/* Resolve callbacks */
+	m_m68k_r_cb.resolve_safe(0);
+	m_m68k_w_cb.resolve_safe();
 
 	// Attempt to get DMA working by just holding DREQ high for the first dma chip
 	m_dma8237_2->dreq1_w(1);
@@ -288,6 +294,7 @@ READ8_MEMBER(smioc_device::dma68k_r)
 
 	m_dma_timer->adjust(attotime::from_usec(10));
 
+	data = m_m68k_r_cb(offset);
 	logerror("dma68k[%04X] => %02X\n", offset, data);
 	return data;
 }
@@ -296,6 +303,8 @@ WRITE8_MEMBER(smioc_device::dma68k_w)
 {
 
 	m_dma_timer->adjust(attotime::from_usec(10));
+
+	m_m68k_w_cb(offset, data);
 
 	logerror("dma68k[%04X] <= %02X\n", offset, data);
 }
@@ -367,7 +376,7 @@ READ8_MEMBER(smioc_device::scc2698b_mmio_r)
 
 WRITE8_MEMBER(smioc_device::scc2698b_mmio_w)
 {
-
+	
 }
 
 // The logic on the SMIOC board somehow proxies the UART's information about what channels are ready into the DMA DREQ lines.

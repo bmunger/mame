@@ -113,7 +113,9 @@ private:
 	DECLARE_WRITE32_MEMBER(r9751_mmio_fff8_w);
 
 	DECLARE_READ8_MEMBER(pdc_dma_r);
-	DECLARE_WRITE8_MEMBER(pdc_dma_w);
+	DECLARE_WRITE8_MEMBER(pdc_dma_w);	
+	DECLARE_READ8_MEMBER(smioc_dma_r);
+	DECLARE_WRITE8_MEMBER(smioc_dma_w);
 
 	void r9751_mem(address_map &map);
 
@@ -223,17 +225,35 @@ void r9751_state::UnifiedTrace(u32 address, u32 data, const char* operation, con
 READ8_MEMBER(r9751_state::pdc_dma_r)
 {
 	/* This callback function takes the value written to 0xFF01000C as the bank offset */
-	uint32_t address = (fdd_dma_bank & 0x7FFFF800) + (offset&0x3FFFF);
-	if(TRACE_DMA) logerror("DMA READ: %08X DATA: %08X\n", address, m_maincpu->space(AS_PROGRAM).read_byte(address));
+	uint32_t address = (fdd_dma_bank & 0x7FFFF800) + (offset & 0x3FFFF);
+	if (TRACE_DMA) logerror("DMA READ: %08X DATA: %08X\n", address, m_maincpu->space(AS_PROGRAM).read_byte(address));
 	return m_maincpu->space(AS_PROGRAM).read_byte(address);
 }
 
 WRITE8_MEMBER(r9751_state::pdc_dma_w)
 {
 	/* This callback function takes the value written to 0xFF01000C as the bank offset */
-	uint32_t address = (fdd_dma_bank & 0x7FFFF800) + (m_pdc->fdd_68k_dma_address&0x3FFFF);
-	m_maincpu->space(AS_PROGRAM).write_byte(address,data);
-	if(TRACE_DMA) logerror("DMA WRITE: %08X DATA: %08X\n", address,data);
+	uint32_t address = (fdd_dma_bank & 0x7FFFF800) + (m_pdc->fdd_68k_dma_address & 0x3FFFF);
+	m_maincpu->space(AS_PROGRAM).write_byte(address, data);
+	if (TRACE_DMA) logerror("DMA WRITE: %08X DATA: %08X\n", address, data);
+}
+
+READ8_MEMBER(r9751_state::smioc_dma_r)
+{
+	/* This callback function takes the value written to 0xFF01000C as the bank offset */
+	uint32_t address = (smioc_dma_bank & 0x7FFFF800) + (offset*2 & 0x3FFFF);
+	//if (TRACE_DMA) 
+		logerror("SMIOC DMA READ: %08X DATA: %08X\n", address, m_maincpu->space(AS_PROGRAM).read_word(address));
+	return m_maincpu->space(AS_PROGRAM).read_word(address) & 0x00FF;
+}
+
+WRITE8_MEMBER(r9751_state::smioc_dma_w)
+{
+	/* This callback function takes the value written to 0xFF01000C as the bank offset */
+	uint32_t address = (smioc_dma_bank & 0x7FFFF800) + (offset*2 & 0x3FFFF);
+	m_maincpu->space(AS_PROGRAM).write_word(address, data);
+	//if (TRACE_DMA) 
+		logerror("SMIOC DMA WRITE: %08X DATA: %08X\n", address, data);
 }
 
 void r9751_state::init_r9751()
@@ -701,6 +721,8 @@ MACHINE_CONFIG_START(r9751_state::r9751)
 
 	/* i/o hardware */
 	MCFG_DEVICE_ADD("smioc", SMIOC, 0)
+	MCFG_SMIOC_R_CB(READ8(r9751_state, smioc_dma_r))
+	MCFG_SMIOC_W_CB(WRITE8(r9751_state, smioc_dma_w))
 
 	/* disk hardware */
 	PDC(config, m_pdc, 0);

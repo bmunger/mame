@@ -31,6 +31,10 @@ public:
 	/* Constructor and Destructor */
 	smioc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
+	template <class Object> static devcb_base &m68k_r_callback(device_t &device, Object &&cb) { return downcast<smioc_device &>(device).m_m68k_r_cb.set_callback(std::forward<Object>(cb)); }
+	template <class Object> static devcb_base &m68k_w_callback(device_t &device, Object &&cb) { return downcast<smioc_device &>(device).m_m68k_w_cb.set_callback(std::forward<Object>(cb)); }
+
+
 	DECLARE_READ8_MEMBER(ram2_mmio_r);
 	DECLARE_WRITE8_MEMBER(ram2_mmio_w);
 
@@ -88,9 +92,18 @@ private:
 	void update_and_log(u16& reg, u16 newValue, const char* register_name);
 
 	emu_timer *m_dma_timer;
+
+	devcb_read8 m_m68k_r_cb;
+	devcb_write8 m_m68k_w_cb;
 };
 
 /* Device type */
 DECLARE_DEVICE_TYPE(SMIOC, smioc_device)
+
+/* MCFG defines */
+#define MCFG_SMIOC_R_CB(_devcb) \
+	devcb = &smioc_device::m68k_r_callback(*device, DEVCB_##_devcb);
+#define MCFG_SMIOC_W_CB(_devcb) \
+	devcb = &smioc_device::m68k_w_callback(*device, DEVCB_##_devcb);
 
 #endif // MAME_MACHINE_SMIOC_H
